@@ -15,8 +15,13 @@ import weakref
 import threading
 from collections import defaultdict
 
-import zmq
-from zmq.eventloop import zmqstream, ioloop
+try:
+    import gevent
+    import zmq.green as zmq
+    from zmq.green.eventloop import zmqstream, ioloop
+except ImportError:
+    import zmq
+    from zmq.eventloop import zmqstream, ioloop
 
 from . import LOGGER
 from .protocol import Protocol
