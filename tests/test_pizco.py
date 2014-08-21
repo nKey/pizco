@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+import gevent.monkey
+gevent.monkey.patch_all()
 import time
 import operator
 import unittest
@@ -8,7 +10,7 @@ import threading
 from threading import Thread
 
 from concurrent.futures import ThreadPoolExecutor
-import zmq
+import zmq.green as zmq
 
 
 def set_zmq_context_to_none():

@@ -15,53 +15,12 @@ import weakref
 import threading
 from collections import defaultdict
 
-try:
-    import gevent
-    import zmq.green as zmq
-    from zmq.green.eventloop import zmqstream, ioloop
-except ImportError:
-    import zmq
-    from zmq.eventloop import zmqstream, ioloop
+import gevent.pool
+import zmq.green as zmq
 
 from . import LOGGER
 from .protocol import Protocol
 from .util import bind
-
-
-class AgentManager(object):
-
-    agents = weakref.WeakKeyDictionary()
-    threads = weakref.WeakKeyDictionary()
-    in_use = weakref.WeakSet()
-
-    @classmethod
-    def add(cls, agent):
-        loop = agent.loop
-        try:
-            cls.agents[loop].append(agent)
-        except KeyError:
-            t = threading.Thread(target=loop.start, name='ioloop-{}'.format(id(loop)))
-            cls.agents[loop] = [agent, ]
-            cls.threads[loop] = t
-            cls.in_use.add(loop)
-            t.daemon = True
-            t.start()
-
-    @classmethod
-    def remove(cls, agent):
-        loop = agent.loop
-        cls.agents[loop].remove(agent)
-        if not cls.agents[loop] and loop in cls.in_use:
-            cls.in_use.remove(loop)
-            loop.add_callback(lambda: loop.stop)
-
-    @classmethod
-    def join(cls, agent):
-        try:
-            while cls.threads[agent.loop].isAlive():
-                cls.threads[agent.loop].join(1)
-        except (KeyboardInterrupt, SystemExit):
-            return
 
 
 class Agent(object):
@@ -78,87 +37,74 @@ class Agent(object):
     :param rep_endpoint: endpoint of the REP socket.
     :param pub_endpoint: endpoint of the PUB socket.
     :param ctx: ZMQ context. If None, the default context will be used.
-    :param loop: ZMQ event loop. If None, the default loop will be used.
     :param protocol: Protocol to be used for the messages.
     """
 
     def __init__(self, rep_endpoint='tcp://127.0.0.1:0', pub_endpoint='tcp://127.0.0.1:0',
-                 ctx=None, loop=None, protocol=None):
-
+                 ctx=None, protocol=None):
         self.ctx = ctx or zmq.Context.instance()
-        self.loop = loop or ioloop.IOLoop.instance()
+        self.pool = gevent.pool.Pool()
         self.protocol = protocol or Protocol(os.environ.get('PZC_KEY', ''),
                                              os.environ.get('PZC_SER', 'pickle'))
-        LOGGER.debug('New agent at {} with context {} and loop {}'.format(rep_endpoint, self.ctx, self.loop))
-
+        LOGGER.debug('New agent at {} with context {} and loop {}'.format(rep_endpoint, self.ctx, self.pool))
         #: Connections to other agents (endpoint:REQ socket)
         self.connections = {}
-
         #: Incoming request sockets
-        rep = self.ctx.socket(zmq.REP)
-        self.rep_endpoint = bind(rep, rep_endpoint)
-
+        self.rep = self.ctx.socket(zmq.REP)
+        self.rep_endpoint = bind(self.rep, rep_endpoint)
         LOGGER.debug('Bound rep at {} REP.'.format(self.rep_endpoint, self.rep_endpoint))
-
         #: Subscribers per topics (topic:count of subscribers)
         self.subscribers = defaultdict(int)
-
         #: Outgoing notification socket
-        pub = self.ctx.socket(zmq.XPUB)
-        self.pub_endpoint = bind(pub, pub_endpoint)
-
+        self.pub = self.ctx.socket(zmq.XPUB)
+        self.pub_endpoint = bind(self.pub, pub_endpoint)
         LOGGER.debug('{} PUB: {}'.format(self.rep_endpoint, self.pub_endpoint))
-
         #: Incoming notification socket
-        sub = self.ctx.socket(zmq.SUB)
-        self.sub_endpoint = bind(sub)
+        self.sub = self.ctx.socket(zmq.SUB)
+        self.sub_endpoint = bind(self.sub)
         LOGGER.debug('{} SUB: {}'.format(self.rep_endpoint, self.sub_endpoint))
-
         #: dict (sender, topic), callback(sender, topic, payload)
         self.notifications_callbacks = {}
         #: endpoints to which the socket is connected.
         self.sub_connections = set()
-
         self.rep_to_pub = {}
+        self._start()
 
-        #Transforms sockets into Streams in the loop, add callbacks and start loop if necessary.
-        self._start(rep, pub, sub)
+    def _loop(self, stream, handler):
+        def message_loop():
+            while self._running:
+                if stream.closed:
+                    break
+                try:
+                    message = stream.recv_multipart()
+                    handler(stream, message)
+                except zmq.ZMQError:
+                    pass
+                finally:
+                    gevent.sleep(0)
+        return message_loop
 
-    def _start(self, rep, pub, sub, in_callback=False):
-        AgentManager.add(self)
-        if not in_callback:
-            self.loop.add_callback(lambda: self._start(rep, pub, sub, True))
-        else:
-            self.rep = zmqstream.ZMQStream(rep, self.loop)
-            self.pub = zmqstream.ZMQStream(pub, self.loop)
-            self.sub = zmqstream.ZMQStream(sub, self.loop)
-            self.rep.on_recv_stream(self._on_request)
-            self.pub.on_recv_stream(self._on_incoming_xpub)
-            self.sub.on_recv_stream(self._on_notification)
-
-            self._running = True
-
-            LOGGER.info('Started agent {}'.format(self.rep_endpoint))
+    def _start(self):
+        self._running = True
+        self.pool.spawn(self._loop(self.rep, self._on_request))
+        self.pool.spawn(self._loop(self.pub, self._on_incoming_xpub))
+        self.pool.spawn(self._loop(self.sub, self._on_notification))
+        LOGGER.info('Started agent {}'.format(self.rep_endpoint))
 
     def stop(self):
         """Stop actor unsubscribing from all notification and closing the streams.
         """
         if not getattr(self, '_running', False):
             return
-
         #self.publish('__status__', 'stop')
         #for (endpoint, topic) in list(self.notifications_callbacks.keys()):
         #    self.unsubscribe(endpoint, topic)
-
-        for stream in (self.rep, self.pub, self.sub):
-            self.loop.add_callback(lambda: stream.on_recv(None))
-            self.loop.add_callback(stream.flush)
-            self.loop.add_callback(stream.close)
-        for sock in self.connections.values():
-            self.loop.add_callback(sock.close)
-        self.connections = {}
-        AgentManager.remove(self)
         self._running = False
+        for stream in (self.rep, self.pub, self.sub):
+            stream.close()
+        for sock in self.connections.values():
+            sock.close()
+        self.connections = {}
         LOGGER.info('Stopped agent {}'.format(self.rep_endpoint))
 
     def __del__(self):
@@ -225,7 +171,7 @@ class Agent(object):
             return {'rep_endpoint': self.rep_endpoint,
                     'pub_endpoint': self.pub_endpoint}
         elif content == 'stop':
-            self.loop.add_timeout(.1, self.stop)
+            self.pool.spawn(self.stop)
             return 'stopping'
         return content
 
@@ -249,7 +195,7 @@ class Agent(object):
         :param topic: topic of the message.
         :param content: content of the message.
         """
-        self.loop.add_callback(lambda: self._publish(topic, content))
+        self.pool.spawn(self._publish, topic, content)
 
     def _on_incoming_xpub(self, stream, message):
         """Handles incoming message in the XPUB sockets, increments or decrements the subscribers
@@ -338,7 +284,7 @@ class Agent(object):
 
         agentid_topic  = self.protocol.format(rep_endpoint, topic, just_header=True)
         LOGGER.debug('Subscribing to {} with {}'.format(agentid_topic, callback))
-        self.loop.add_callback(lambda: self._subscribe(pub_endpoint, agentid_topic))
+        self.pool.spawn(self._subscribe, pub_endpoint, agentid_topic)
         self.notifications_callbacks[(rep_endpoint, topic)] = callback
 
     def unsubscribe(self, rep_endpoint, topic, pub_endpoint=None):
@@ -359,7 +305,7 @@ class Agent(object):
 
         agentid_topic  = self.protocol.format(rep_endpoint, topic, just_header=True)
         LOGGER.debug('Unsubscribing to {}'.format(agentid_topic))
-        self.loop.add_callback(lambda: self._unsubscribe(pub_endpoint, agentid_topic))
+        self.pool.spawn(self._unsubscribe, pub_endpoint, agentid_topic)
         del self.notifications_callbacks[(rep_endpoint, topic)]
 
     def _on_notification(self, stream, message):
@@ -393,4 +339,4 @@ class Agent(object):
         LOGGER.debug('Received notification: {}, {}, {}, {}'.format(sender, topic, msgid, content))
 
     def join(self):
-        AgentManager.join(self)
+        self.pool.join()
