@@ -11,8 +11,6 @@
 
 
 import os
-import weakref
-import threading
 from collections import defaultdict
 
 import gevent.pool
