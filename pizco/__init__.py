@@ -9,13 +9,16 @@
     :license: BSD, see LICENSE for more details.
 """
 
+import gevent.monkey
+gevent.monkey.patch_all()
+
 import os
 import sys
 import logging
 import subprocess
 import warnings
 
-import zmq
+import zmq.green as zmq
 
 if (zmq.zmq_version_info()[0] < 3):
     warnings.warn(
