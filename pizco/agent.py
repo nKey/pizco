@@ -39,9 +39,10 @@ class Agent(object):
     """
 
     def __init__(self, rep_endpoint='tcp://127.0.0.1:0', pub_endpoint='tcp://127.0.0.1:0',
-                 ctx=None, protocol=None):
+                 num_handlers=None, ctx=None, protocol=None):
         self.ctx = ctx or zmq.Context.instance()
         self.pool = gevent.pool.Pool()
+        self.handler_pool = gevent.pool.Pool(size=num_handlers)
         self.protocol = protocol or Protocol(os.environ.get('PZC_KEY', ''),
                                              os.environ.get('PZC_SER', 'pickle'))
         LOGGER.debug('New agent at {} with context {} and loop {}'.format(rep_endpoint, self.ctx, self.pool))
@@ -75,7 +76,7 @@ class Agent(object):
                     break
                 try:
                     message = stream.recv_multipart()
-                    handler(stream, message)
+                    self.handler_pool.spawn(handler, stream, message)
                 except zmq.ZMQError:
                     pass
                 finally:
@@ -169,7 +170,7 @@ class Agent(object):
             return {'rep_endpoint': self.rep_endpoint,
                     'pub_endpoint': self.pub_endpoint}
         elif content == 'stop':
-            self.pool.spawn(self.stop)
+            gevent.spawn_later(0.1, self.stop)
             return 'stopping'
         return content
 
@@ -317,6 +318,7 @@ class Agent(object):
         except:
             LOGGER.debug('Invalid message {}'.format(message))
         else:
+            LOGGER.debug('Incoming notification {} {}'.format(sender, topic))
             callback = self.notifications_callbacks[(sender, topic)]
             if callback:
                 callback(sender, topic, content, msgid)
@@ -338,3 +340,4 @@ class Agent(object):
 
     def join(self):
         self.pool.join()
+        self.handler_pool.join()
