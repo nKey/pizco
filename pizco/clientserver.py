@@ -102,7 +102,8 @@ def ServerLauncher(*args, **kwargs):
     final_rep_endpoint.append(s.rep_endpoint)
     time.sleep(5)
     s.serve_forever()
-    
+
+
 class Server(Agent):
     """Serves an object for remote access from a Proxy. A Server can serve a single object.
 
