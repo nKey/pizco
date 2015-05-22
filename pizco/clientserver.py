@@ -22,12 +22,14 @@ import multiprocessing as mp
 
 from . import LOGGER
 from .util import Signal
-from .agent import Agent, default_io_loop
+from .agent import Agent
 from .compat import futures
 
 import logging
 #logger = mp.log_to_stderr()
 #logger.setLevel(mp.SUBDEBUG)
+
+from .tornadoagentmanager import TornadoAgentManager
 
 HIDE_TRACEBACK = os.environ.get('PZC_HIDE_TRACEBACK', True)
 CREATION_TIMEOUT = os.environ.get('PZC_CREATION_TIMEOUT',2.5)
@@ -114,7 +116,7 @@ class Server(Agent):
     """
 
     def __init__(self, served_object, rep_endpoint='tcp://127.0.0.1:0', pub_endpoint='tcp://127.0.0.1:0',
-                 ctx=None, loop=None):
+                 ctx=None, manager=TornadoAgentManager):
         try:
             LOGGER.debug("Server start")
             if rep_endpoint.find("*") != -1:
@@ -123,7 +125,7 @@ class Server(Agent):
             if served_object is None:
                 self.did_instantiate = False
             self.signal_calls = {}
-            super(Server, self).__init__(rep_endpoint, pub_endpoint, ctx, loop)
+            super(Server, self).__init__(rep_endpoint, pub_endpoint, ctx, manager)
         except:
             import traceback
             LOGGER.error(traceback.format_exc())
@@ -400,10 +402,10 @@ class ProxyAgent(Agent):
     :param remote_rep_endpoint: REP endpoint of the Server.
     """
 
-    def __init__(self, remote_rep_endpoint, creation_timeout=0):
-        super(ProxyAgent, self).__init__()
+    def __init__(self, remote_rep_endpoint, creation_timeout=0, manager=None):
+        super(ProxyAgent, self).__init__(manager=manager)
 
-        self._remote_stopping = threading.Event()
+        self._remote_stopping = manager.event()
         self._remote_stopping.clear()
 
         self.remote_rep_endpoint = remote_rep_endpoint
@@ -591,8 +593,8 @@ class Proxy(object):
 
     :param remote_endpoint: endpoint of the server.
     """
-    def __init__(self, remote_endpoint,creation_timeout=0, ):
-        self._proxy_agent = ProxyAgent(remote_endpoint, creation_timeout)
+    def __init__(self, remote_endpoint,creation_timeout=0, manager=TornadoAgentManager):
+        self._proxy_agent = ProxyAgent(remote_endpoint, creation_timeout, manager)
         self._proxy_attr_as_remote = []
         self._proxy_attr_as_object = []
         self._proxy_signals = {}
