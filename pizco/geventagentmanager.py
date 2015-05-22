@@ -1,3 +1,5 @@
+from gevent.lock import RLock
+
 import gevent
 import gevent.pool
 import zmq.green as zmq
@@ -87,5 +89,5 @@ class GeventAgentManager(object):
         return gevent.event.Event()
 
     @classmethod
-    def lock(self): # TODO create gevent like lock
-        pass
+    def lock(self):
+        return RLock()

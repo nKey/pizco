@@ -105,3 +105,7 @@ class TornadoAgentManager(object):
     @classmethod
     def event(self):
         return threading.Event()
+
+    @classmethod
+    def lock(self):
+        return threading.Lock()

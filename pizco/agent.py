@@ -39,7 +39,7 @@ class Agent(object):
     def __init__(self, rep_endpoint='tcp://127.0.0.1:0', pub_endpoint='tcp://127.0.0.1:0',
                  ctx=None, manager=None, protocol=None):
         self.manager = manager
-        # self._running_lock = threading.Lock()
+        self._running_lock = self.manager.lock()
         self._running = self.manager.event()
         self._ending = self.manager.event()
         self._running.clear()
@@ -128,12 +128,12 @@ class Agent(object):
         """Stop actor unsubscribing from all notification and closing the streams.
         """
         LOGGER.debug("starting stopping from loop")
-        # with self._running_lock:
-        if not self._running.isSet():
-            LOGGER.warning("calling stop on a stopping object")
-            return
-        else:
-            self._running.clear()
+        with self._running_lock:
+            if not self._running.isSet():
+                LOGGER.warning("calling stop on a stopping object")
+                return
+            else:
+                self._running.clear()
 
         LOGGER.debug("stopping actor")
         #send __status__ signal to "proxy or connected servers
