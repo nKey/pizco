@@ -8,7 +8,7 @@ import gevent
 if sys.version_info < (3,0):
     input = raw_input
 
-from pizco.clientserver import Proxy
+from pizco import Proxy
 from pizco.geventagentmanager import GeventAgentManager
 
 proxy = Proxy('tcp://127.0.0.1:8000', manager=GeventAgentManager)

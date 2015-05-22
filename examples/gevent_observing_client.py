@@ -3,7 +3,7 @@
 import sys
 import gevent
 
-from pizco.clientserver import Proxy
+from pizco import Proxy
 from pizco.geventagentmanager import GeventAgentManager
 
 if sys.version_info < (3,0):

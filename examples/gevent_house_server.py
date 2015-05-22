@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from pizco.clientserver import Server
+from pizco import Server
 from pizco.geventagentmanager import GeventAgentManager
 
 from examples.common import House
