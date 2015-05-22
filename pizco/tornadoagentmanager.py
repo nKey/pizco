@@ -19,9 +19,7 @@ class TornadoAgentManager(object):
 
     in_use = compat.WeakSet()
 
-    @classmethod
-    def zmq():
-        return zmq
+    zmq = zmq
 
     @classmethod
     def add(cls, agent):

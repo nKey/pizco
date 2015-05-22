@@ -1,5 +1,3 @@
-from .util import Singleton
-
 import gevent
 import gevent.pool
 import zmq.green as zmq
@@ -58,17 +56,15 @@ class GeventZMQStream(object):
 
 class GeventAgentManager(object):
 
-    @classmethod
-    def zmq():
-        return zmq
+    zmq = zmq
 
     @classmethod
     def add(cls, agent):
-        pass
+        agent.loop.running = True
 
     @classmethod
     def remove(cls, agent):
-        pass
+        agent.loop.running = False
 
     @classmethod
     def is_loop_in_current_thread(cls, loop):
