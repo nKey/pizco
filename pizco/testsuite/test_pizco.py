@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 import zmq
 
 from pizco.compat import Queue, Empty
+from pizco.tornadoagentmanager import TornadoAgentManager
 
 def set_zmq_context_to_none():
     if hasattr(zmq.Context, '_instance'):
@@ -225,7 +226,7 @@ class AgentTest(unittest.TestCase):
 
     def test_agent_rep(self):
 
-        agent = Agent()
+        agent = Agent(manager=TornadoAgentManager)
 
         req = self.create_socket(zmq.REQ)
         req.connect(agent.rep_endpoint)
@@ -245,8 +246,8 @@ class AgentTest(unittest.TestCase):
 
     def test_agent_stop(self):
 
-        agent = Agent()
-        agent_ctrl = Agent()
+        agent = Agent(manager=TornadoAgentManager)
+        agent_ctrl = Agent(manager=TornadoAgentManager)
 
         ret = agent_ctrl.request(agent.rep_endpoint, 3)
         self.assertEqual(3, ret)
@@ -389,7 +390,7 @@ class AgentTest(unittest.TestCase):
 
         prot = Protocol()
 
-        agent = Agent()
+        agent = Agent(manager=TornadoAgentManager)
 
         topic1 = 'topic1'
         topic2 = 'topic2'
@@ -424,7 +425,7 @@ class AgentTest(unittest.TestCase):
         port = pub.bind_to_random_port('tcp://127.0.0.1')
         endpoint = 'tcp://127.0.0.1:{0}'.format(port)
 
-        agent = Agent()
+        agent = Agent(manager=TornadoAgentManager)
 
         topic1 = 'topic1'
         topic2 = 'topic2'
