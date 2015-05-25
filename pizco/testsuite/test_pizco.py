@@ -284,8 +284,8 @@ class AgentTest(unittest.TestCase):
 
     def test_agent_req_agent_rep(self):
 
-        agent1 = Add1()
-        agent2 = Add1()
+        agent1 = Add1(manager=TornadoAgentManager)
+        agent2 = Add1(manager=TornadoAgentManager)
 
         value = 0
         while value < 100:
@@ -470,7 +470,7 @@ class AgentTest(unittest.TestCase):
             def on_notification(self, sender, topic, msgid, content):
                 self.called += 1
 
-        agent = DefNot()
+        agent = DefNot(manager=TornadoAgentManager)
 
         topic1 = 'topic1'
         topic2 = 'topic2'
