@@ -370,12 +370,12 @@ class Server(Agent):
         return remotes, objects, signals
 
     def __getstate__(self):
-        return {"remote_rep_endpoint":self.rep_endpoint}
+        return {"remote_rep_endpoint":self.rep_endpoint, 'manager': self.manager}
 
     def __setstate__(self, state):
         print("seting state")
         self.__class__ = Proxy
-        self = Proxy.__init__(self,state["remote_rep_endpoint"])
+        self = Proxy.__init__(self,state["remote_rep_endpoint"], manager=state["manager"])
         print("calling creation")
 
 class SignalDict(defaultdict):
@@ -660,7 +660,7 @@ class Proxy(object):
             self._proxy_wait_stop()
 
     def __getstate__(self):
-        return {"remote_rep_endpoint":self._proxy_agent.remote_rep_endpoint}
+        return {"remote_rep_endpoint":self._proxy_agent.remote_rep_endpoint, "manager": self._proxy_agent.manager}
 
     def __setstate__(self, state):
-        Proxy.__init__(self,state["remote_rep_endpoint"])
+        Proxy.__init__(self,state["remote_rep_endpoint"], manager=state["manager"])
