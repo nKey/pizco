@@ -16,7 +16,7 @@ class GeventIOLoop(object):
         return self.pool.spawn(callback, *args, **kwargs)
 
     def add_timeout(self, deadline, callback):
-        return self.pool.spawn_later(deadline, callback)
+        return gevent.spawn_later(deadline, callback)
 
     def join(self):
         self.pool.join()
@@ -32,6 +32,12 @@ class GeventZMQStream(object):
 
     def on_recv_stream(self, callback):
         return self.loop.add_callback(self._loop(self.socket, callback))
+
+    def on_recv(self, *args):
+        pass
+
+    def flush(self):
+        pass
 
     def _loop(self, stream, handler):
         def message_loop():
