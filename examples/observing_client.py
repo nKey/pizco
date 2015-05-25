@@ -8,14 +8,14 @@ from pizco import Proxy
 if sys.version_info < (3,0):
     input = raw_input
 
-def on_lights_on(value, old_value, others):
+def on_lights_on(value, old_value):
     print('The lights_on has been changed from {0} to {1}'.format(old_value, value))
 
-def on_door_open(value, old_value, others):
+def on_door_open(value, old_value):
     print('The front door has been changed from {0} to {1}'.format(old_value, value))
 
-def on_color_change(value, old_value, others):
-    print('The color has been changed from {0} to {1}'.format(old_value, value))
+def on_color_change(value):
+    print('The color has been changed to {0}'.format(value))
 
 proxy = Proxy('tcp://127.0.0.1:8000')
 

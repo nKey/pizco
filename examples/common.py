@@ -23,10 +23,10 @@ class House(object):
         self._door_open = False
         self._lights_on = False
 
-        self.door_open_changed = Signal()
-        self.lights_on_changed = Signal()
+        self.door_open_changed = Signal(nargs=2)
+        self.lights_on_changed = Signal(nargs=2)
 
-        self.color_changed = Signal()
+        self.color_changed = Signal(nargs=1)
 
         self._pool = futures.ThreadPoolExecutor(max_workers=1)
 
