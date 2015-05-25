@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 
+import gevent.monkey
+gevent.monkey.patch_all()
+
 from pizco import Server
 from pizco.geventagentmanager import GeventAgentManager
 
