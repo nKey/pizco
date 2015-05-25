@@ -472,5 +472,4 @@ class Agent(object):
 
     def join(self):
         self.wait_stop()
-        self.loop.join()
         #AgentManager.join(self)
