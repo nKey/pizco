@@ -15,10 +15,7 @@ import sys
 
 PYTHON3 = sys.version >= '3'
 
-if sys.version_info < (3, 2):
-    import futures
-else:
-    from concurrent import futures
+from concurrent import futures
 
 if sys.version_info < (2, 7):
     import unittest2 as unittest
