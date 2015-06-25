@@ -13,7 +13,7 @@ python:
 before_install:
   - sudo add-apt-repository -y ppa:shnatsel/dnscrypt
   - sudo apt-get update
-  - pip install -q --use-mirrors nose pyzmq
+  - pip install -q --use-mirrors nose pyzmq gevent
 
 script: 
   - python setup.py test
